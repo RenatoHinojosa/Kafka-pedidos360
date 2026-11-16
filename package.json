@@ -11,7 +11,8 @@
     "producer": "node bridge/producer.js",
     "report": "node report/consumer.js",
     "audit": "node audit/consumer.js",
-    "test": "node --test test/logica.test.js"
+    "test": "node --test test/logica.test.js",
+    "estado": "node ensamble/estado.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
