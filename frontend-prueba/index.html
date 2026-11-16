@@ -1,0 +1,67 @@
+<!doctype html>
+<!-- Frontend de prueba (si aún no tienen el de Angular listo).
+     Servir en el puerto 4200 (el origen permitido por CORS):  npx http-server frontend-prueba -p 4200 -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Pedidos360 · Reportes y Auditoría</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #f6f6f4; color: #222; }
+    section { background: #fff; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+    h2 { font-size: 16px; margin: 0 0 8px; }
+    .barra { background: #3b6fd8; height: 14px; border-radius: 3px; display: inline-block; vertical-align: middle; }
+    td { padding: 2px 10px 2px 0; }
+    #estado { font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Pedidos360</h1>
+  <p id="estado">cargando…</p>
+  <section><h2>Ventas por hora</h2><table id="ventas"></table></section>
+  <section><h2>Lead time</h2><div id="lead"></div></section>
+  <section><h2>Top productos</h2><table id="top"></table></section>  <section><h2>Pedidos activos por estado</h2><table id="estados"></table></section>
+  <section>
+    <h2>Auditoría · timeline</h2>
+    <input id="pedido" value="P-1001"> <button onclick="cargarAudit()">Ver</button>
+    <table id="audit"></table>
+  </section>
+
+<script>
+  // Equivale al archivo environment de Angular
+  const environment = { reportUrl: 'http://localhost:60295/api/report', auditUrl: 'http://localhost:3002/api/audit' };
+
+  const get = url => fetch(url).then(r => r.json());
+  const filas = (id, datos, fn) => document.getElementById(id).innerHTML = datos.map(fn).join('');
+  const barra = (v, max) => `<span class="barra" style="width:${Math.round(200 * v / (max || 1))}px"></span> ${v}`;
+
+  async function cargarReportes() {
+    try {
+      const [ventas, lead, top, estados] = await Promise.all(
+        ['ventas-por-hora', 'lead-time', 'top-productos', 'estados'].map(p => get(`${environment.reportUrl}/${p}`)));
+      const maxV = Math.max(...ventas.map(v => v.total)), maxT = Math.max(...top.map(t => t.unidades));
+      filas('ventas', ventas, v => `<tr><td>${v.hora}</td><td>${barra(v.total, maxV)}</td></tr>`);
+      document.getElementById('lead').textContent =
+        `Promedio: ${lead.promedioSeg.toFixed(1)} s (${lead.pedidos.length} pedidos entregados)`;
+      filas('top', top, t => `<tr><td>${t.productoId}</td><td>${barra(t.unidades, maxT)}</td></tr>`);
+      filas('estados', estados, e => `<tr><td>${e.estado}</td><td>${e.cantidad}</td></tr>`);
+      document.getElementById('estado').textContent = 'actualizado ' + new Date().toLocaleTimeString();
+    } catch (e) {
+      document.getElementById('estado').textContent = 'report no responde: ' + e.message;
+    }
+  }
+
+  async function cargarAudit() {
+    const id = document.getElementById('pedido').value;
+    try {
+      filas('audit', await get(`${environment.auditUrl}/${encodeURIComponent(id)}`),
+        a => `<tr><td>${a.fecha}</td><td>${a.tipo}</td><td>${a.quien}</td><td>${a.desdeDonde}</td></tr>`);
+    } catch (e) {
+      document.getElementById('audit').innerHTML = `<tr><td>audit no responde: ${e.message}</td></tr>`;
+    }
+  }
+
+  cargarReportes(); cargarAudit();
+  setInterval(() => { cargarReportes(); cargarAudit(); }, 5000);   // se actualiza sola cada 5 s
+</script>
+</body>
+</html>
